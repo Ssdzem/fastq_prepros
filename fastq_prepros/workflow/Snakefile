@@ -1,0 +1,72 @@
+import os
+
+# Load configuration
+configfile: "config/config.yaml"
+
+# Define paths from config
+fastq_dir = config["fastq_dir"]
+index_dir = config["index_dir"]
+output_dir = config["output_dir"]
+bam_dir = config["bam_dir"]
+counts_dir = config["counts_dir"]
+ref_dir = config["ref_dir"]
+whitelist = config["whitelist"]
+
+# Helper function to fetch all fastq samples
+def get_fastq_samples():
+    projects = os.listdir(fastq_dir)
+    samples = []
+    for project in projects:
+        project_path = os.path.join(fastq_dir, project)
+        if os.path.isdir(project_path):
+            samples.extend([
+                os.path.join(project, sample)
+                for sample in os.listdir(project_path)
+                if os.path.isdir(os.path.join(project_path, sample))
+            ])
+    return samples
+
+# List of all samples
+samples = get_fastq_samples()
+
+# Define rules
+rule all:
+    input:
+        expand(f"{bam_dir}/{{project}}/{{sample}}.bam", project=samples, sample=samples),
+        expand(f"{counts_dir}/{{project}}/{{sample}}_matrix.txt", project=samples, sample=samples)
+
+rule generate_index:
+    input:
+        genome_fasta=os.path.join(ref_dir, "Homo_sapiens.GRCh38.dna.primary_assembly.fa"),
+        gtf=os.path.join(ref_dir, "Homo_sapiens.GRCh38.93.gtf"),
+        whitelist=whitelist
+    output:
+        directory=index_dir
+    shell:
+        """
+        bash workflow/scripts/generate_index.sh {input.genome_fasta} {input.gtf} {input.whitelist} {output}
+        """
+
+rule map_reads:
+    input:
+        fastq1=f"{fastq_dir}/{{project}}/{{sample}}/R1.fastq.gz",
+        fastq2=f"{fastq_dir}/{{project}}/{{sample}}/R2.fastq.gz",
+        index_dir=index_dir
+    output:
+        bam=f"{bam_dir}/{{project}}/{{sample}}.bam"
+    threads: config["star_threads"]
+    shell:
+        """
+        bash workflow/scripts/map_reads.sh {input.fastq1} {input.fastq2} {input.index_dir} {output.bam} {threads}
+        """
+
+rule generate_matrix:
+    input:
+        bam=f"{bam_dir}/{{project}}/{{sample}}.bam",
+        index_dir=index_dir
+    output:
+        matrix=f"{counts_dir}/{{project}}/{{sample}}_matrix.txt"
+    shell:
+        """
+        bash workflow/scripts/matrix_counts.sh {input.bam} {input.index_dir} {output.matrix}
+        """
