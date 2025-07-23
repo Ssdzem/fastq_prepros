@@ -1,0 +1,27 @@
+#–– Snakemake outputs and data folders ––
+fastq_prepros/input/fastq/
+fastq_prepros/input/raw/
+fastq_prepros/input/index/
+fastq_prepros/input/ref/
+fastq_prepros/input/whitelist/
+fastq_prepros/output/bam/
+fastq_prepros/output/counts/
+
+
+#–– Conda / envs ––
+**/envs/
+**/*.yaml.save
+.env/
+
+#–– Logs and intermediate files ––
+**/*.log
+**/*.out
+**/tmp/
+
+#–– Python cache ––
+__pycache__/
+*.pyc
+
+#–– MacOS / misc ––
+.DS_Store
+*.swp
