@@ -1,20 +1,22 @@
 #!/bin/bash
-
-# Arguments
 FASTQ_R1=$1
 FASTQ_R2=$2
 GENOME_DIR=$3
-OUTPUT_BAM=$4
-THREADS=$5
+WHITELIST=$4
+OUTPUT_BAM=$5
+THREADS=$6
 
-# Extract output prefix (remove .bam extension)
 OUTPUT_PREFIX=${OUTPUT_BAM%.bam}
 
-# STAR mapping
+mkdir -p "$(dirname "$OUTPUT_BAM")"
+
 STAR --runThreadN "$THREADS" \
---readFilesIn "$FASTQ_R1" "$FASTQ_R2" \
---genomeDir "$GENOME_DIR" \
---outSAMtype BAM SortedByCoordinate \
---outFileNamePrefix "$OUTPUT_PREFIX" \
---soloType CB_UMI_Simple \
---soloCBwhitelist "$GENOME_DIR/whitelist.txt"
+     --readFilesIn "$FASTQ_R1" "$FASTQ_R2" \
+     --readFilesCommand zcat \
+     --genomeDir "$GENOME_DIR" \
+     --outSAMtype BAM SortedByCoordinate \
+     --outFileNamePrefix "$OUTPUT_PREFIX" \
+     --soloType CB_UMI_Simple \
+     --soloCBwhitelist "$WHITELIST"
+
+mv "${OUTPUT_PREFIX}Aligned.sortedByCoord.out.bam" "$OUTPUT_BAM"

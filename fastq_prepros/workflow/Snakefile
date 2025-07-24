@@ -1,72 +1,126 @@
+# Snakefile
+
 import os
+import pandas as pd
+from snakemake.io import directory, temp
 
 # Load configuration
 configfile: "config/config.yaml"
 
-# Define paths from config
-fastq_dir = config["fastq_dir"]
-index_dir = config["index_dir"]
-output_dir = config["output_dir"]
-bam_dir = config["bam_dir"]
-counts_dir = config["counts_dir"]
-ref_dir = config["ref_dir"]
-whitelist = config["whitelist"]
+# Config variables
+raw_dir      = config["raw_dir"]
+fastq_dir    = config["fastq_dir"]
+index_dir    = config["index_dir"]
+bam_dir      = config["bam_dir"]
+counts_dir   = config["counts_dir"]
+whitelist    = config["whitelist"]
+threads      = config["star_threads"]
 
-# Helper function to fetch all fastq samples
-def get_fastq_samples():
-    projects = os.listdir(fastq_dir)
-    samples = []
-    for project in projects:
-        project_path = os.path.join(fastq_dir, project)
-        if os.path.isdir(project_path):
-            samples.extend([
-                os.path.join(project, sample)
-                for sample in os.listdir(project_path)
-                if os.path.isdir(os.path.join(project_path, sample))
-            ])
-    return samples
+# Read metadata CSVs
+df_curls  = pd.read_csv(config["project_curls_path"])
+df_sample = pd.read_csv(config["metadata_path"])
 
-# List of all samples
-samples = get_fastq_samples()
+# Normalize column names
+df_curls.columns  = [c.lower() for c in df_curls.columns]    # 'project','curls'
+df_sample.columns = [c.lower() for c in df_sample.columns]   # 'bundle_uuid','proyect','ident_sample'
 
-# Define rules
+# Build helper mappings
+project_list = df_curls["project"].unique().tolist()
+# project → list of bundle_uuids
+sample_map   = df_sample.groupby("proyect")["bundle_uuid"].apply(list).to_dict()
+# project → curl command
+curl_dict    = df_curls.set_index("project")["curls"].to_dict()
+
+# rule all: final targets are the count matrices for each (project, sample)
 rule all:
     input:
-        expand(f"{bam_dir}/{{project}}/{{sample}}.bam", project=samples, sample=samples),
-        expand(f"{counts_dir}/{{project}}/{{sample}}_matrix.txt", project=samples, sample=samples)
+        expand(
+            f"{counts_dir}/{{project}}/{{sample}}_matrix.txt",
+            project=project_list,
+            sample=lambda wc: sample_map[wc.project]
+        )
 
+# 1) Download each project into a temp raw_dir (will be auto-deleted)
+rule download_project:
+    input:
+        curl = lambda wc: curl_dict[wc.project]
+    output:
+        raw_project = temp(directory(os.path.join(raw_dir, "{project}")))
+    shell:
+        """
+        python workflow/scripts/download_project.py \
+          "{input.curl}" "{output.raw_project}"
+        """
+
+# 2) Filter & concatenate only the needed bundle_uuids into fastq_dir
+rule filter_and_preprocess:
+    input:
+        raw_project = directory(os.path.join(raw_dir, "{project}"))
+    params:
+        sample_id = lambda wc: f"{wc.project}/{wc.sample}"
+    output:
+        r1 = os.path.join(fastq_dir, "{project}", "{sample}", "R1.fastq.gz"),
+        r2 = os.path.join(fastq_dir, "{project}", "{sample}", "R2.fastq.gz")
+    shell:
+        """
+        python workflow/scripts/filter_and_preprocess_fastqs.py \
+          "{input.raw_project}" "{params.sample_id}" \
+          "{output.r1}" "{output.r2}"
+        """
+
+# 3) Build STAR genome index (once)
 rule generate_index:
     input:
-        genome_fasta=os.path.join(ref_dir, "Homo_sapiens.GRCh38.dna.primary_assembly.fa"),
-        gtf=os.path.join(ref_dir, "Homo_sapiens.GRCh38.93.gtf"),
-        whitelist=whitelist
+        genome_fasta = config["genome_fasta"],
+        gtf           = config["gtf"],
+        whitelist     = whitelist
     output:
-        directory=index_dir
+        index_dir = directory(index_dir)
+    threads: threads
     shell:
         """
-        bash workflow/scripts/generate_index.sh {input.genome_fasta} {input.gtf} {input.whitelist} {output}
+        bash workflow/scripts/generate_index.sh \
+          "{input.genome_fasta}" \
+          "{input.gtf}" \
+          "{input.whitelist}" \
+          "{output.index_dir}" \
+          {threads}
         """
 
+# 4) Map reads with STAR (per sample)
 rule map_reads:
     input:
-        fastq1=f"{fastq_dir}/{{project}}/{{sample}}/R1.fastq.gz",
-        fastq2=f"{fastq_dir}/{{project}}/{{sample}}/R2.fastq.gz",
-        index_dir=index_dir
+        fastq1    = os.path.join(fastq_dir, "{project}", "{sample}", "R1.fastq.gz"),
+        fastq2    = os.path.join(fastq_dir, "{project}", "{sample}", "R2.fastq.gz"),
+        index_dir = index_dir,
+        whitelist = whitelist
     output:
-        bam=f"{bam_dir}/{{project}}/{{sample}}.bam"
-    threads: config["star_threads"]
+        bam = os.path.join(bam_dir, "{project}", "{sample}.bam")
+    threads: threads
     shell:
         """
-        bash workflow/scripts/map_reads.sh {input.fastq1} {input.fastq2} {input.index_dir} {output.bam} {threads}
+        bash workflow/scripts/map_reads.sh \
+          "{input.fastq1}" \
+          "{input.fastq2}" \
+          "{input.index_dir}" \
+          "{input.whitelist}" \
+          "{output.bam}" \
+          {threads}
         """
 
+# 5) Generate count matrix with STAR Solo (per sample)
 rule generate_matrix:
     input:
-        bam=f"{bam_dir}/{{project}}/{{sample}}.bam",
-        index_dir=index_dir
+        bam       = os.path.join(bam_dir, "{project}", "{sample}.bam"),
+        index_dir = index_dir
     output:
-        matrix=f"{counts_dir}/{{project}}/{{sample}}_matrix.txt"
+        matrix    = os.path.join(counts_dir, "{project}", "{sample}_matrix.txt")
+    threads: threads
     shell:
         """
-        bash workflow/scripts/matrix_counts.sh {input.bam} {input.index_dir} {output.matrix}
+        bash workflow/scripts/matrix_counts.sh \
+          "{input.bam}" \
+          "{input.index_dir}" \
+          "{output.matrix}" \
+          {threads}
         """
