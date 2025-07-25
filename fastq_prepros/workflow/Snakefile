@@ -42,20 +42,20 @@ rule all:
 
 # 1) Download each project into a temp raw_dir (will be auto-deleted)
 rule download_project:
-    input:
-        curl = lambda wc: curl_dict[wc.project]
     output:
         raw_project = temp(directory(os.path.join(raw_dir, "{project}")))
+    params:
+        curl=lambda wildcards: curl_dict[wildcards.project]
     shell:
         """
-        python workflow/scripts/download_project.py \
-          "{input.curl}" "{output.raw_project}"
+	python workflow/scripts/download_project.py \
+	  "{params.curl}" "{output.raw_project}"
         """
 
 # 2) Filter & concatenate only the needed bundle_uuids into fastq_dir
 rule filter_and_preprocess:
     input:
-        raw_project = directory(os.path.join(raw_dir, "{project}"))
+        raw_project = os.path.join(raw_dir, "{project}")
     params:
         sample_id = lambda wc: f"{wc.project}/{wc.sample}"
     output:

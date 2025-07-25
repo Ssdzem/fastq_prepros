@@ -1,5 +1,4 @@
 raw_dir: "input/raw"
-raw_dir: "input/raw"
 fastq_dir: "input/fastq"
 index_dir: "input/index/ch38ref"
 bam_dir: "output/bam"

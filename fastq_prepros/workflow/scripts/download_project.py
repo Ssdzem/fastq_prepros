@@ -2,14 +2,12 @@ import sys
 import os
 import subprocess
 
-def download_project(curl, output_dir):
+def download_project(curl_cmd, output_dir):
     os.makedirs(output_dir, exist_ok=True)
-    tar_file = os.path.join(output_dir, "fastqs.tar.gz")
-    subprocess.run(f"curl -o {tar_file} {curl}", shell=True, check=True)
-    subprocess.run(f"tar -xzvf {tar_file} -C {output_dir}", shell=True, check=True)
-    os.remove(tar_file)
+    # Run the full curl pipeline directly inside output_dir:
+    subprocess.run(curl_cmd, shell=True, cwd=output_dir, check=True)
 
 if __name__ == "__main__":
-    curl = sys.argv[1]
+    curl_cmd = sys.argv[1]
     output_dir = sys.argv[2]
-    download_project(curl, output_dir)
+    download_project(curl_cmd, output_dir)
