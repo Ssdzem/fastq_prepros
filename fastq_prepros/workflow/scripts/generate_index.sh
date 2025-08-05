@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -euo pipefail
 # Arguments
 GENOME_FASTA=$1
 GTF_FILE=$2
@@ -19,4 +20,6 @@ STAR --runThreadN "$THREADS" \
      --genomeDir "$OUTPUT_DIR" \
      --genomeFastaFiles "$GENOME_FASTA" \
      --sjdbGTFfile "$GTF_FILE" \
-     --genomeSAindexNbases 12
+     --sjdbOverhang 99 \
+     --genomeSAindexNbases 12 \
+     --soloCBwhitelist "$WHITELIST"

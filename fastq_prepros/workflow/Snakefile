@@ -55,17 +55,19 @@ rule download_project:
 # 2) Filter & concatenate only the needed bundle_uuids into fastq_dir
 rule filter_and_preprocess:
     input:
-        raw_project = os.path.join(raw_dir, "{project}")
+        raw_project = os.path.join(raw_dir, "{project}"),
+        metadata = config["metadata_path"]
     params:
-        sample_id = lambda wc: f"{wc.project}/{wc.sample}"
+        project = lambda wc: wc.project,
+        sample  = lambda wc: wc.sample
     output:
         r1 = os.path.join(fastq_dir, "{project}", "{sample}", "R1.fastq.gz"),
         r2 = os.path.join(fastq_dir, "{project}", "{sample}", "R2.fastq.gz")
     shell:
         """
         python workflow/scripts/filter_and_preprocess_fastqs.py \
-          "{input.raw_project}" "{params.sample_id}" \
-          "{output.r1}" "{output.r2}"
+          "{input.raw_project}" "{params.sample}" "{params.project}" \
+          "{input.metadata}" "{output.r1}" "{output.r2}"
         """
 
 # 3) Build STAR genome index (once)
@@ -111,16 +113,24 @@ rule map_reads:
 # 5) Generate count matrix with STAR Solo (per sample)
 rule generate_matrix:
     input:
-        bam       = os.path.join(bam_dir, "{project}", "{sample}.bam"),
-        index_dir = index_dir
+        r1           = os.path.join(fastq_dir, "{project}", "{sample}", "R1.fastq.gz"),
+        r2           = os.path.join(fastq_dir, "{project}", "{sample}", "R2.fastq.gz"),
+        genomeDir    = index_dir,
+        cb_whitelist = whitelist
     output:
-        matrix    = os.path.join(counts_dir, "{project}", "{sample}_matrix.txt")
+        matrix       = os.path.join(counts_dir, "{project}", "{sample}_matrix.txt")
     threads: threads
+    params:
+        # prefix for STARsolo output (ends in underscore)
+        prefix       = lambda wc, output: os.path.splitext(output.matrix)[0] + "_"
     shell:
         """
         bash workflow/scripts/matrix_counts.sh \
-          "{input.bam}" \
-          "{input.index_dir}" \
+          "{input.r1}" \
+          "{input.r2}" \
+          "{input.genomeDir}" \
+          "{input.cb_whitelist}" \
+          "{params.prefix}" \
           "{output.matrix}" \
           {threads}
         """
