@@ -17,8 +17,8 @@ def filter_and_preprocess(raw_dir, sample_id, output_r1, output_r2):
         raise FileNotFoundError(f"[!] Sample directory '{raw_sample_dir}' not found.")
 
     raw_fastqs = sorted(glob(os.path.join(raw_sample_dir, "*.fastq.gz")))
-    r1_files = [f for f in raw_fastqs if "_R1_" in f]
-    r2_files = [f for f in raw_fastqs if "_R2_" in f]
+    r1_files = [f for f in raw_fastqs if "R1" in f]
+    r2_files = [f for f in raw_fastqs if "R2" in f]
 
     if not r1_files or not r2_files:
         raise ValueError(f"[!] No R1 or R2 files found in '{raw_sample_dir}'.")

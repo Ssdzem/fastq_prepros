@@ -31,14 +31,31 @@ sample_map   = df_sample.groupby("proyect")["bundle_uuid"].apply(list).to_dict()
 # project → curl command
 curl_dict    = df_curls.set_index("project")["curls"].to_dict()
 
-# rule all: final targets are the count matrices for each (project, sample)
+# Map each bundle_uuid to its chemistry
+chem_map = df_sample.set_index("bundle_uuid")["chemistry"].to_dict()
+
+# ← Define CB/UMI parameters for each chemistry
+param_map = {
+    "10x3'v2": {"cb": 16, "umi": 10},
+    "10x3'v3": {"cb": 16, "umi": 12},
+    "10x5'v1": {"cb": 16, "umi": 10}
+}
+
+project_cfg = [config["project"]] if config.get("project") else project_list
+
+# Flatten all (project, sample) combinations into concrete target paths:
+all_targets = []
+for proj in project_cfg:
+    for sample in sample_map[proj]:
+        all_targets += [
+            os.path.join(counts_dir, proj, f"{sample}_matrix.txt"),
+            os.path.join(bam_dir,    proj, f"{sample}.bam")
+        ]
+
+# rule all: final targets are the count matrices and BAM for each sample or bundle uuid of the projects
 rule all:
     input:
-        expand(
-            f"{counts_dir}/{{project}}/{{sample}}_matrix.txt",
-            project=project_list,
-            sample=lambda wc: sample_map[wc.project]
-        )
+        all_targets
 
 # 1) Download each project into a temp raw_dir (will be auto-deleted)
 rule download_project:
@@ -56,17 +73,14 @@ rule download_project:
 rule filter_and_preprocess:
     input:
         raw_project = os.path.join(raw_dir, "{project}"),
-        metadata = config["metadata_path"]
-    params:
-        project = lambda wc: wc.project,
-        sample  = lambda wc: wc.sample
+        metadata    = config["metadata_path"]
     output:
         r1 = os.path.join(fastq_dir, "{project}", "{sample}", "R1.fastq.gz"),
         r2 = os.path.join(fastq_dir, "{project}", "{sample}", "R2.fastq.gz")
     shell:
         """
         python workflow/scripts/filter_and_preprocess_fastqs.py \
-          "{input.raw_project}" "{params.sample}" "{params.project}" \
+          "{input.raw_project}" "{wildcards.sample}" "{wildcards.project}" \
           "{input.metadata}" "{output.r1}" "{output.r2}"
         """
 
@@ -99,6 +113,9 @@ rule map_reads:
     output:
         bam = os.path.join(bam_dir, "{project}", "{sample}.bam")
     threads: threads
+    params:
+        cb_len = lambda wc: param_map[ chem_map[wc.sample] ]["cb"],
+        umi_len = lambda wc: param_map[ chem_map[wc.sample] ]["umi"]
     shell:
         """
         bash workflow/scripts/map_reads.sh \
@@ -107,7 +124,7 @@ rule map_reads:
           "{input.index_dir}" \
           "{input.whitelist}" \
           "{output.bam}" \
-          {threads}
+          {params.cb_len} {params.umi_len} {threads}
         """
 
 # 5) Generate count matrix with STAR Solo (per sample)
@@ -122,7 +139,9 @@ rule generate_matrix:
     threads: threads
     params:
         # prefix for STARsolo output (ends in underscore)
-        prefix       = lambda wc, output: os.path.splitext(output.matrix)[0] + "_"
+        prefix       = lambda wc, output: os.path.splitext(output.matrix)[0] + "_",
+        cb_len     = lambda wc: param_map[ chem_map[wc.sample] ]["cb"],
+        umi_len    = lambda wc: param_map[ chem_map[wc.sample] ]["umi"]
     shell:
         """
         bash workflow/scripts/matrix_counts.sh \
@@ -132,5 +151,5 @@ rule generate_matrix:
           "{input.cb_whitelist}" \
           "{params.prefix}" \
           "{output.matrix}" \
-          {threads}
+          {params.cb_len} {params.umi_len} {threads}
         """

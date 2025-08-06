@@ -7,39 +7,47 @@ GENOME_DIR=$3
 CB_WHITELIST=$4
 OUTPUT_PREFIX=$5       # e.g. output/counts/.../{sample}_
 OUTPUT_MATRIX=$6       # e.g. output/counts/.../{sample}_matrix.txt
-THREADS=$7
+CB_LEN=$7
+UMI_LEN=$8
+THREADS=$9
 
-# 1) Auto-detect R1 length
-set +o pipefail
-seq=$(zcat "$FASTQ_R1" | sed -n '2{p;q;}')
-set -o pipefail
-TOTAL_LEN=${#seq}
+if [[ $# -ne 9 ]]; then
+  echo "Usage: $0 FASTQ_R1 FASTQ_R2 GENOME_DIR CB_WHITELIST OUTPUT_PREFIX OUTPUT_MATRIX CB_LEN UMI_LEN THREADS" >&2
+  exit 1
+fi
 
-# 2) Infer CB/UMI lengths
-if   [[ "$TOTAL_LEN" -eq 28 ]]; then CB_LEN=16; UMI_LEN=12
-elif [[ "$TOTAL_LEN" -eq 26 ]]; then CB_LEN=16; UMI_LEN=10
-else CB_LEN=16; UMI_LEN=$((TOTAL_LEN-16)); fi
-
-echo "Detected R1=${TOTAL_LEN}, CB=${CB_LEN}, UMI=${UMI_LEN}" >&2
-
-# 3) Ensure output dir
+# 1) Ensure output dir
 mkdir -p "$(dirname "$OUTPUT_MATRIX")"
 
-# 4) Run STARsolo—R1 then R2, guaranteed
+# 2) Detect R1 length and decide barcode check
+# (disable pipefail around this pipeline to avoid SIGPIPE abort)
+set +o pipefail
+read1_seq=$(zcat "$FASTQ_R1" | sed -n '2{p;q;}')
+set -o pipefail
+
+R1_LEN=${#read1_seq}
+if [[ $((CB_LEN+UMI_LEN)) -eq $R1_LEN ]]; then
+  BARCODE_LEN=$((CB_LEN+UMI_LEN))
+else
+  echo "Note: R1 length ($R1_LEN) != CB+UMI ($((CB_LEN+UMI_LEN))); disabling length check" >&2
+  BARCODE_LEN=0
+fi
+
+# 3) Run STARsolo—R1 then R2, guaranteed
 STAR --runThreadN "$THREADS" \
      --genomeDir "$GENOME_DIR" \
-     --readFilesIn "$FASTQ_R2" "$FASTQ_R1halo4yhaloreach" \
+     --readFilesIn "$FASTQ_R2" "$FASTQ_R1" \
      --readFilesCommand zcat \
      --soloType CB_UMI_Simple \
      --soloCBwhitelist "$CB_WHITELIST" \
      --soloFeatures Gene \
-     --soloUMIlen "$UMI_LEN" \
      --soloCBlen "$CB_LEN" \
-     --soloBarcodeReadLength "$TOTAL_LEN" \
+     --soloUMIlen "$UMI_LEN" \
+     --soloBarcodeReadLength "$BARCODE_LEN" \
      --soloUMIfiltering MultiGeneUMI \
      --outFileNamePrefix "${OUTPUT_PREFIX}"
 
-# 5) Find and move the matrix file
+# 4) Find and move the matrix file
 SOLO_DIR="${OUTPUT_PREFIX}Solo.out"
 if [[ -f "${SOLO_DIR}/Gene/matrix.txt" ]]; then
   mv "${SOLO_DIR}/Gene/matrix.txt" "$OUTPUT_MATRIX"

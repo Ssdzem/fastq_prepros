@@ -11,3 +11,5 @@ whitelist: "input/whitelist/737K-august-2016.txt"
 output_dir: "output"
 ref_dir: "input/ref"
 star_threads: 20
+
+project: null
