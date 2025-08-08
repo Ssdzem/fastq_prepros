@@ -26,13 +26,33 @@ df_sample.columns = [c.lower() for c in df_sample.columns]   # 'bundle_uuid','pr
 
 # Build helper mappings
 project_list = df_curls["project"].unique().tolist()
-# project → list of bundle_uuids
-sample_map   = df_sample.groupby("proyect")["bundle_uuid"].apply(list).to_dict()
-# project → curl command
-curl_dict    = df_curls.set_index("project")["curls"].to_dict()
 
-# Map each bundle_uuid to its chemistry
-chem_map = df_sample.set_index("bundle_uuid")["chemistry"].to_dict()
+# project → list of ident_samples
+sample_map = (
+    df_sample
+    .groupby("proyect")["ident_sample"]
+    .apply(lambda x: sorted(x.unique().tolist()))
+    .to_dict()
+)
+
+# (project, ident_sample) → list of bundle_uuids
+bundles_per_sample = (
+    df_sample
+    .groupby(["proyect", "ident_sample"])["bundle_uuid"]
+    .apply(list)
+    .to_dict()
+)
+
+# Map each project to its curl command
+curl_dict = df_curls.set_index("project")["curls"].to_dict()
+
+# ident_sample → chemistry (assumes all lanes share the same chemistry)
+chem_map = (
+    df_sample
+    .groupby("ident_sample")["chemistry"]
+    .agg(lambda x: x.unique().tolist()[0])
+    .to_dict()
+)
 
 # ← Define CB/UMI parameters for each chemistry
 param_map = {
@@ -43,7 +63,7 @@ param_map = {
 
 project_cfg = [config["project"]] if config.get("project") else project_list
 
-# Flatten all (project, sample) combinations into concrete target paths:
+# Flatten all (project, ident_sample) combinations into targets:
 all_targets = []
 for proj in project_cfg:
     for sample in sample_map[proj]:

@@ -406,7 +406,7 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
       <a class="navbar-brand col-sm-3 col-md-2 mr-0" href="https://snakemake.readthedocs.io">Snakemake Report</a>
       <div class="nav navbar-nav navbar-center" id="brand"></div>
       <ul class="nav navbar-nav navbar-right" style="padding-right: 10px;">
-        <li class="text-white">Tue Aug  5 14:18:39 2025 CST</li>
+        <li class="text-white">Fri Aug  8 06:11:18 2025 CST</li>
         <li><a class="text-white" href="https://snakemake.readthedocs.io">Snakemake 6.15.1</a></li>
       </ul>
       <!--<input id="searchbar" class="invisible form-control form-control-dark w-100" type="text" placeholder="Search" aria-label="Search">-->
@@ -505,7 +505,9 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 <span class="normal">10</span>
 <span class="normal">11</span>
 <span class="normal">12</span>
-<span class="normal">13</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nt">raw_dir</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;input/raw&quot;</span><span class="w"></span>
+<span class="normal">13</span>
+<span class="normal">14</span>
+<span class="normal">15</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nt">raw_dir</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;input/raw&quot;</span><span class="w"></span>
 <span class="nt">fastq_dir</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;input/fastq&quot;</span><span class="w"></span>
 <span class="nt">index_dir</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;input/index/ch38ref&quot;</span><span class="w"></span>
 <span class="nt">bam_dir</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;output/bam&quot;</span><span class="w"></span>
@@ -518,6 +520,8 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 <span class="nt">output_dir</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;output&quot;</span><span class="w"></span>
 <span class="nt">ref_dir</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;input/ref&quot;</span><span class="w"></span>
 <span class="nt">star_threads</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">20</span><span class="w"></span>
+
+<span class="nt">project</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">null</span><span class="w"></span>
 </code></pre></div></td></tr></table></div>
 
                       </div>
@@ -551,6 +555,240 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
           </div>
         </div>
 
+        <div data-rule="generate_matrix" class="modal rule-properties" tabindex="-1" role="dialog">
+          <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">Rule generate_matrix</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <table class="table w-auto table-sm table-borderless ruletable">
+                  <caption>Rule properties</caption>
+                  <tbody>
+                    <tr>
+                      <th scope="row">Jobs</th><td>5</td>
+                    </tr>
+
+                    <tr>
+                      <th scope="row" colspan=2>Input files</th>
+                    </tr>
+                    <tr>
+                      <td class="rule-property" colspan=2>
+                        <ul>
+                            <li>input/fastq/{project}/{sample}/R1.fastq.gz</li>
+                            <li>input/fastq/{project}/{sample}/R2.fastq.gz</li>
+                            <li>input/index/ch38ref</li>
+                            <li>input/whitelist/737K-august-2016.txt</li>
+                        </ul>
+                      </td>
+                    </tr>
+
+                    <tr>
+                      <th scope="row" colspan=2>Output files</th>
+                    </tr>
+                    <tr>
+                      <td class="rule-property" colspan=2>
+                        <ul>
+                            <li>output/counts/{project}/{sample}_matrix.txt</li>
+                        </ul>
+                      </td>
+                    </tr>
+
+
+
+                    <tr>
+                      <th scope="row" colspan=2>Code</th>
+                    </tr>
+                    <tr>
+                      <td class="rule-property" colspan=2>
+                        <div class="source"><table class="sourcetable"><tr><td class="linenos"><div class="linenodiv"><pre><span class="normal">1</span>
+<span class="normal">2</span></pre></div></td><td class="code"><div><pre><span></span><code>        bash workflow/scripts/matrix_counts.sh           <span class="s2">&quot;{input.r1}&quot;</span>           <span class="s2">&quot;{input.r2}&quot;</span>           <span class="s2">&quot;{input.genomeDir}&quot;</span>           <span class="s2">&quot;{input.cb_whitelist}&quot;</span>           <span class="s2">&quot;{params.prefix}&quot;</span>           <span class="s2">&quot;{output.matrix}&quot;</span>           <span class="o">{</span>params.cb_len<span class="o">}</span> <span class="o">{</span>params.umi_len<span class="o">}</span> <span class="o">{</span>threads<span class="o">}</span>
+        
+</code></pre></div></td></tr></table></div>
+
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div data-rule="filter_and_preprocess" class="modal rule-properties" tabindex="-1" role="dialog">
+          <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">Rule filter_and_preprocess</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <table class="table w-auto table-sm table-borderless ruletable">
+                  <caption>Rule properties</caption>
+                  <tbody>
+                    <tr>
+                      <th scope="row">Jobs</th><td>5</td>
+                    </tr>
+
+                    <tr>
+                      <th scope="row" colspan=2>Input files</th>
+                    </tr>
+                    <tr>
+                      <td class="rule-property" colspan=2>
+                        <ul>
+                            <li>input/raw/{project}</li>
+                            <li>config/proyects_metadata_samples_fastqs.csv</li>
+                        </ul>
+                      </td>
+                    </tr>
+
+                    <tr>
+                      <th scope="row" colspan=2>Output files</th>
+                    </tr>
+                    <tr>
+                      <td class="rule-property" colspan=2>
+                        <ul>
+                            <li>input/fastq/{project}/{sample}/R1.fastq.gz</li>
+                            <li>input/fastq/{project}/{sample}/R2.fastq.gz</li>
+                        </ul>
+                      </td>
+                    </tr>
+
+
+
+                    <tr>
+                      <th scope="row" colspan=2>Code</th>
+                    </tr>
+                    <tr>
+                      <td class="rule-property" colspan=2>
+                        <div class="source"><table class="sourcetable"><tr><td class="linenos"><div class="linenodiv"><pre><span class="normal">1</span>
+<span class="normal">2</span></pre></div></td><td class="code"><div><pre><span></span><code>        python workflow/scripts/filter_and_preprocess_fastqs.py           <span class="s2">&quot;{input.raw_project}&quot;</span> <span class="s2">&quot;{wildcards.sample}&quot;</span> <span class="s2">&quot;{wildcards.project}&quot;</span>           <span class="s2">&quot;{input.metadata}&quot;</span> <span class="s2">&quot;{output.r1}&quot;</span> <span class="s2">&quot;{output.r2}&quot;</span>
+        
+</code></pre></div></td></tr></table></div>
+
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div data-rule="download_project" class="modal rule-properties" tabindex="-1" role="dialog">
+          <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">Rule download_project</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <table class="table w-auto table-sm table-borderless ruletable">
+                  <caption>Rule properties</caption>
+                  <tbody>
+                    <tr>
+                      <th scope="row">Jobs</th><td>1</td>
+                    </tr>
+
+
+                    <tr>
+                      <th scope="row" colspan=2>Output files</th>
+                    </tr>
+                    <tr>
+                      <td class="rule-property" colspan=2>
+                        <ul>
+                            <li>input/raw/{project}</li>
+                        </ul>
+                      </td>
+                    </tr>
+
+
+
+                    <tr>
+                      <th scope="row" colspan=2>Code</th>
+                    </tr>
+                    <tr>
+                      <td class="rule-property" colspan=2>
+                        <div class="source"><table class="sourcetable"><tr><td class="linenos"><div class="linenodiv"><pre><span class="normal">1</span>
+<span class="normal">2</span></pre></div></td><td class="code"><div><pre><span></span><code>	python workflow/scripts/download_project.py 	  <span class="s2">&quot;{params.curl}&quot;</span> <span class="s2">&quot;{output.raw_project}&quot;</span>
+        
+</code></pre></div></td></tr></table></div>
+
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div data-rule="map_reads" class="modal rule-properties" tabindex="-1" role="dialog">
+          <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+              <div class="modal-header">
+                <h5 class="modal-title">Rule map_reads</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <table class="table w-auto table-sm table-borderless ruletable">
+                  <caption>Rule properties</caption>
+                  <tbody>
+                    <tr>
+                      <th scope="row">Jobs</th><td>5</td>
+                    </tr>
+
+                    <tr>
+                      <th scope="row" colspan=2>Input files</th>
+                    </tr>
+                    <tr>
+                      <td class="rule-property" colspan=2>
+                        <ul>
+                            <li>input/fastq/{project}/{sample}/R1.fastq.gz</li>
+                            <li>input/fastq/{project}/{sample}/R2.fastq.gz</li>
+                            <li>input/index/ch38ref</li>
+                            <li>input/whitelist/737K-august-2016.txt</li>
+                        </ul>
+                      </td>
+                    </tr>
+
+                    <tr>
+                      <th scope="row" colspan=2>Output files</th>
+                    </tr>
+                    <tr>
+                      <td class="rule-property" colspan=2>
+                        <ul>
+                            <li>output/bam/{project}/{sample}.bam</li>
+                        </ul>
+                      </td>
+                    </tr>
+
+
+
+                    <tr>
+                      <th scope="row" colspan=2>Code</th>
+                    </tr>
+                    <tr>
+                      <td class="rule-property" colspan=2>
+                        <div class="source"><table class="sourcetable"><tr><td class="linenos"><div class="linenodiv"><pre><span class="normal">1</span>
+<span class="normal">2</span></pre></div></td><td class="code"><div><pre><span></span><code>        bash workflow/scripts/map_reads.sh           <span class="s2">&quot;{input.fastq1}&quot;</span>           <span class="s2">&quot;{input.fastq2}&quot;</span>           <span class="s2">&quot;{input.index_dir}&quot;</span>           <span class="s2">&quot;{input.whitelist}&quot;</span>           <span class="s2">&quot;{output.bam}&quot;</span>           <span class="o">{</span>params.cb_len<span class="o">}</span> <span class="o">{</span>params.umi_len<span class="o">}</span> <span class="o">{</span>threads<span class="o">}</span>
+        
+</code></pre></div></td></tr></table></div>
+
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     <!-- Optional JavaScript -->
@@ -1225,11 +1463,11 @@ if (typeof module !== 'undefined') {
         "data": [
           {
             "name": "node-data",
-            "values": [{'rule': 'all', 'fx': 215.49, 'fy': 234.0}, {'rule': 'download_project', 'fx': 110.49, 'fy': 18.0}, {'rule': 'filter_and_preprocess', 'fx': 110.49, 'fy': 90.0}, {'rule': 'generate_index', 'fx': 320.49, 'fy': 90.0}, {'rule': 'generate_matrix', 'fx': 215.49, 'fy': 162.0}]
+            "values": [{'rule': 'all', 'fx': 215.49, 'fy': 234.0}, {'rule': 'download_project', 'fx': 110.49, 'fy': 18.0}, {'rule': 'filter_and_preprocess', 'fx': 110.49, 'fy': 90.0}, {'rule': 'generate_index', 'fx': 320.49, 'fy': 90.0}, {'rule': 'generate_matrix', 'fx': 132.49, 'fy': 162.0}, {'rule': 'map_reads', 'fx': 298.49, 'fy': 162.0}]
           },
           {
             "name": "link-data",
-            "values": [{'target': 1, 'source': 2, 'value': 1}, {'target': 2, 'source': 4, 'value': 1}, {'target': 3, 'source': 4, 'value': 1}, {'target': 4, 'source': 0, 'value': 1}]
+            "values": [{'target': 1, 'source': 2, 'value': 1}, {'target': 2, 'source': 4, 'value': 1}, {'target': 2, 'source': 5, 'value': 1}, {'target': 3, 'source': 4, 'value': 1}, {'target': 3, 'source': 5, 'value': 1}, {'target': 4, 'source': 0, 'value': 1}, {'target': 5, 'source': 0, 'value': 1}]
           }
         ],
 
@@ -1337,7 +1575,7 @@ if (typeof module !== 'undefined') {
       var runtimes_spec = {
         "$schema": "https://vega.github.io/schema/vega-lite/v3.json",
         "description": "Runtimes of jobs.",
-        "data": {"values": []},
+        "data": {"values": [{'rule': 'download_project', 'runtime': 40432.14944553375}, {'rule': 'filter_and_preprocess', 'runtime': 1396.2793638706207}, {'rule': 'filter_and_preprocess', 'runtime': 1383.1114037036896}, {'rule': 'filter_and_preprocess', 'runtime': 1285.6556923389435}, {'rule': 'filter_and_preprocess', 'runtime': 1173.0640161037445}, {'rule': 'filter_and_preprocess', 'runtime': 418.99457263946533}, {'rule': 'generate_matrix', 'runtime': 3216.8975245952606}, {'rule': 'generate_matrix', 'runtime': 3040.194317817688}, {'rule': 'generate_matrix', 'runtime': 2790.995363712311}, {'rule': 'generate_matrix', 'runtime': 2287.537036180496}, {'rule': 'generate_matrix', 'runtime': 1020.6647222042084}, {'rule': 'map_reads', 'runtime': 3550.4122841358185}, {'rule': 'map_reads', 'runtime': 3478.2887511253357}, {'rule': 'map_reads', 'runtime': 3239.049187898636}, {'rule': 'map_reads', 'runtime': 2543.3754591941833}, {'rule': 'map_reads', 'runtime': 1106.0204467773438}]},
         "mark": "point",
         "encoding": {
           "x": {"field": "runtime", "type": "quantitative",
@@ -1354,7 +1592,7 @@ if (typeof module !== 'undefined') {
         "$schema": "https://vega.github.io/schema/vega-lite/v3.json",
         "description": "Timeline of jobs.",
         "data": {
-          "values": []
+          "values": [{'rule': 'download_project', 'starttime': '2025-08-07T08:42:34.094488', 'endtime': '2025-08-07T19:56:26.243933'}, {'rule': 'filter_and_preprocess', 'starttime': '2025-08-07T19:56:26.327933', 'endtime': '2025-08-07T20:19:42.607297'}, {'rule': 'filter_and_preprocess', 'starttime': '2025-08-07T19:56:26.335933', 'endtime': '2025-08-07T20:19:29.447336'}, {'rule': 'filter_and_preprocess', 'starttime': '2025-08-07T19:56:26.307933', 'endtime': '2025-08-07T20:17:51.963625'}, {'rule': 'filter_and_preprocess', 'starttime': '2025-08-07T19:56:26.331933', 'endtime': '2025-08-07T20:15:59.395949'}, {'rule': 'filter_and_preprocess', 'starttime': '2025-08-07T19:56:26.323933', 'endtime': '2025-08-07T20:03:25.318506'}, {'rule': 'generate_matrix', 'starttime': '2025-08-07T23:34:56.193282', 'endtime': '2025-08-08T00:28:33.090807'}, {'rule': 'generate_matrix', 'starttime': '2025-08-08T00:28:33.190806', 'endtime': '2025-08-08T01:19:13.385124'}, {'rule': 'generate_matrix', 'starttime': '2025-08-07T22:12:58.416750', 'endtime': '2025-08-07T22:59:29.412113'}, {'rule': 'generate_matrix', 'starttime': '2025-08-08T02:59:35.157334', 'endtime': '2025-08-08T03:37:42.694370'}, {'rule': 'generate_matrix', 'starttime': '2025-08-07T22:59:29.444113', 'endtime': '2025-08-07T23:16:30.108835'}, {'rule': 'map_reads', 'starttime': '2025-08-07T20:19:48.835278', 'endtime': '2025-08-07T21:18:59.247562'}, {'rule': 'map_reads', 'starttime': '2025-08-08T02:01:36.860583', 'endtime': '2025-08-08T02:59:35.149334'}, {'rule': 'map_reads', 'starttime': '2025-08-07T21:18:59.303562', 'endtime': '2025-08-07T22:12:58.352750'}, {'rule': 'map_reads', 'starttime': '2025-08-08T01:19:13.449124', 'endtime': '2025-08-08T02:01:36.824583'}, {'rule': 'map_reads', 'starttime': '2025-08-07T23:16:30.140836', 'endtime': '2025-08-07T23:34:56.161282'}]
         },
         "mark": "point",
         "encoding": {
