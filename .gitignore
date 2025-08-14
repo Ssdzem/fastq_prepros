@@ -5,11 +5,8 @@ fastq_prepros/input/raw/**/*
 fastq_prepros/input/fastq/**/*
 !fastq_prepros/input/fastq/README.md
 
-fastq_prepros/input/index/**/*
-!fastq_prepros/input/index/README.md
-
-fastq_prepros/input/ref/**/*
-!fastq_prepros/input/ref/README.md
+fastq_prepros/input/refdata-gex-GRCh38-2024-A/**/*
+!fastq_prepros/input/refdata-gex-GRCh38-2024-A/README.md
 
 fastq_prepros/input/whitelist/**/*
 !fastq_prepros/input/whitelist/README.md
@@ -19,6 +16,9 @@ fastq_prepros/output/bam/**/*
 
 fastq_prepros/output/counts/**/*
 !fastq_prepros/output/counts/README.md
+
+fastq_prepros/output/qc/**/*
+!fastq_prepros/output/qc/README.md
 
 # Rest
 **/envs/
@@ -34,3 +34,5 @@ __pycache__/
 
 .DS_Store
 *.swp
+
+fastq_prepros/.snakemake/
