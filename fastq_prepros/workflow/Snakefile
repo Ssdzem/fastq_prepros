@@ -13,8 +13,17 @@ fastq_dir    = config["fastq_dir"]
 index_dir    = config["index_dir"]
 bam_dir      = config["bam_dir"]
 counts_dir   = config["counts_dir"]
-whitelist    = config["whitelist"]
 threads      = config["star_threads"]
+sjdb_overhang = config["sjdb_overhang"]
+sa_nbases     = config["genomeSAindexNbases"]
+wl_map        = config.get("whitelists", {})
+qc_dir       = config["qc_dir"]
+scripts      = config["scripts"]
+
+# Phase switch
+# Accepts true/false/1/0/yes/no; default = false (full pipeline)
+_first_raw = str(config.get("first_fastq", "false")).strip().lower()
+first_fastq = _first_raw in ("1", "true", "yes", "y")
 
 # Read metadata CSVs
 df_curls  = pd.read_csv(config["project_curls_path"])
@@ -54,6 +63,14 @@ chem_map = (
     .to_dict()
 )
 
+# Chemistry → whitelist map access helper
+def wl_for_sample(sample):
+    chem = chem_map[sample]
+    try:
+        return wl_map[chem]
+    except KeyError:
+        raise ValueError(f"No whitelist configured for chemistry '{chem}'")
+
 # ← Define CB/UMI parameters for each chemistry
 param_map = {
     "10x3'v2": {"cb": 16, "umi": 10},
@@ -63,31 +80,52 @@ param_map = {
 
 project_cfg = [config["project"]] if config.get("project") else project_list
 
-# Flatten all (project, ident_sample) combinations into targets:
+# build phase-specific targets
+# Final (phase 2) targets = BAM + matrix per sample (original behavior)
 all_targets = []
+# Phase 1 targets = vibe_check outputs per sample (stop after QC)
+vibe_targets = []
+
 for proj in project_cfg:
     for sample in sample_map[proj]:
+        # original final targets
         all_targets += [
             os.path.join(counts_dir, proj, f"{sample}_matrix.txt"),
-            os.path.join(bam_dir,    proj, f"{sample}.bam")
+            os.path.join(bam_dir,    proj, f"{sample}.bam"),
         ]
+        # QC-only phase targets (existing outputs of fastq_vibe_check)
+        vibe_targets += [
+            os.path.join(qc_dir, proj, f"{sample}_vibe.json"),
+            os.path.join(qc_dir, proj, f"{sample}_chemistry.txt"),
+        ]
+
+# Pick default targets based on phase
+final_targets = vibe_targets if first_fastq else all_targets
 
 # rule all: final targets are the count matrices and BAM for each sample or bundle uuid of the projects
 rule all:
     input:
-        all_targets
+        final_targets
 
 # 1) Download each project into a temp raw_dir (will be auto-deleted)
 rule download_project:
     output:
         raw_project = temp(directory(os.path.join(raw_dir, "{project}")))
     params:
-        curl=lambda wildcards: curl_dict[wildcards.project]
+        curl=lambda wildcards: curl_dict[wildcards.project],
+        script=lambda w: scripts["download_project"]
+    resources:
+        net = 1               # <<< throttle concurrent network jobs
+    retries: 3                # <<< let Snakemake auto-retry transient failures
+    log:
+        os.path.join(qc_dir, "{project}", "_download.log")
     shell:
-        """
-	python workflow/scripts/download_project.py \
-	  "{params.curl}" "{output.raw_project}"
-        """
+        r'''
+        python "{params.script}" \
+          --curl-cmd "{params.curl}" \
+          --output-dir "{output.raw_project}" \
+          2>&1 | tee -a "{log}"
+        '''
 
 # 2) Filter & concatenate only the needed bundle_uuids into fastq_dir
 rule filter_and_preprocess:
@@ -96,49 +134,125 @@ rule filter_and_preprocess:
         metadata    = config["metadata_path"]
     output:
         r1 = os.path.join(fastq_dir, "{project}", "{sample}", "R1.fastq.gz"),
-        r2 = os.path.join(fastq_dir, "{project}", "{sample}", "R2.fastq.gz")
+        r2 = os.path.join(fastq_dir, "{project}", "{sample}", "R2.fastq.gz"),
+        keep_done = os.path.join(fastq_dir, "{project}", "{sample}", "Bundle_UUIDS", ".complete")
+    params:
+        script=lambda w: scripts["filter_and_preprocess"]
+    shell:
+        r"""
+        python "{params.script}" \
+          --raw-dir "{input.raw_project}" \
+          --sample "{wildcards.sample}" \
+          --project "{wildcards.project}" \
+          --metadata-csv "{input.metadata}" \
+          --out-r1 "{output.r1}" \
+          --out-r2 "{output.r2}" \
+          --keep-dir "$(dirname {output.keep_done})"
+
+    mkdir -p "$(dirname {output.keep_done})"
+    date > "{output.keep_done}"
+    """
+# 3) Vibe check fastqs rule
+# This rule performs a lightweight “vibe check” on each 10x-style FASTQ bundle
+# BEFORE mapping. It writes:
+#   1) JSON report with signals you can inspect or parse (vibe.json)
+#   2) chemistry.txt with a single line (e.g., "10x_3prime_v3_or_v3.1")
+#
+# Inputs:
+#   - R1/R2 (and optional I2) FASTQs
+#   - 10x barcode inclusion lists (“whitelists”) for v2, v3/v3.1, and v4
+#
+# Outputs:
+#   - results/hca_fetch/qc/{project}/{sample}/vibe.json
+#   - results/hca_fetch/qc/{project}/{sample}/chemistry.txt
+#
+# Config expectations (adjust to your repo):
+#   config["fastq_dir"]        -> base dir holding per-project/sample FASTQs
+#   config["whitelists"]["v2"] -> path to 737K-august-2016.txt (3’ v2)
+#   config["whitelists"]["v3"] -> path to 3M-february-2018*.txt.gz (3’ v3/3.1)
+#   config["whitelists"]["v4"] -> path to 3M-3pgex-may-2023*.txt.gz (3’ v4)  # optional
+#
+# Notes on STARsolo later:
+# • For 10x GEX, STARsolo expects --readFilesIn <R2> <R1> (cDNA first, then CB/UMI),
+#   which is the opposite of “usual” paired-end order. Verified in STAR/STARsolo docs.
+# • R1 carries CB+UMI: 16+10 (v2) or 16+12 (v3+/v4). This script infers the right combo.
+
+rule fastq_vibe_check:
+    input:
+        R1=lambda w: f"{config['fastq_dir']}/{w.project}/{w.sample}/R1.fastq.gz",
+        R2=lambda w: f"{config['fastq_dir']}/{w.project}/{w.sample}/R2.fastq.gz",
+        wl_v2=lambda w: wl_map.get("10x3'v2", ""),
+        wl_v3=lambda w: wl_map.get("10x3'v3", ""),
+    output:
+        json      = os.path.join(qc_dir, "{project}", "{sample}_vibe.json"),
+        chemistry = os.path.join(qc_dir, "{project}", "{sample}_chemistry.txt")
+    params:
+        # Pull metadata chemistry string if you track it per (project, sample).
+        # You can change this mapping to match your own metadata structure.
+        meta_chem=lambda w: (
+            config.get("metadata", {})
+                  .get(w.project, {})
+                  .get(w.sample, {})
+                  .get("chemistry", "unknown")
+        ),
+        # How many reads to sample per measurement – tradeoff: speed vs. robustness.
+        max_reads=1_000_000,
+        script   = lambda w: scripts["fastq_vibe_check"]
+    threads: 2
     shell:
         """
-        python workflow/scripts/filter_and_preprocess_fastqs.py \
-          "{input.raw_project}" "{wildcards.sample}" "{wildcards.project}" \
-          "{input.metadata}" "{output.r1}" "{output.r2}"
+        python "{params.script}" \
+          --r1 {input.R1} \
+          --r2 {input.R2} \
+          --wl-v2 {input.wl_v2} \
+          --wl-v3 {input.wl_v3} \
+          --metadata-chem {params.meta_chem} \
+          --max-reads {params.max_reads} \
+          --json-out {output.json} \
+          --chem-out {output.chemistry}
         """
 
-# 3) Build STAR genome index (once)
+
+# 4) Build STAR genome index (once)
 rule generate_index:
     input:
         genome_fasta = config["genome_fasta"],
         gtf           = config["gtf"],
-        whitelist     = whitelist
     output:
         index_dir = directory(index_dir)
     threads: threads
+    params:
+        sjdb_overhang = sjdb_overhang,
+        sa_nbases     = sa_nbases,
+        script        = scripts["generate_index"]
     shell:
-        """
-        bash workflow/scripts/generate_index.sh \
+        r"""
+        bash "{params.script}" \
           "{input.genome_fasta}" \
           "{input.gtf}" \
-          "{input.whitelist}" \
           "{output.index_dir}" \
+          {params.sjdb_overhang} \
+          {params.sa_nbases} \
           {threads}
         """
 
-# 4) Map reads with STAR (per sample)
+# 5) Map reads with STAR (per sample)
 rule map_reads:
     input:
         fastq1    = os.path.join(fastq_dir, "{project}", "{sample}", "R1.fastq.gz"),
         fastq2    = os.path.join(fastq_dir, "{project}", "{sample}", "R2.fastq.gz"),
         index_dir = index_dir,
-        whitelist = whitelist
+        whitelist = lambda wc: wl_for_sample(wc.sample)
     output:
         bam = os.path.join(bam_dir, "{project}", "{sample}.bam")
     threads: threads
     params:
         cb_len = lambda wc: param_map[ chem_map[wc.sample] ]["cb"],
-        umi_len = lambda wc: param_map[ chem_map[wc.sample] ]["umi"]
+        umi_len = lambda wc: param_map[ chem_map[wc.sample] ]["umi"],
+        script  = scripts["map_reads"]
     shell:
-        """
-        bash workflow/scripts/map_reads.sh \
+        r"""
+        bash "{params.script}" \
           "{input.fastq1}" \
           "{input.fastq2}" \
           "{input.index_dir}" \
@@ -147,13 +261,13 @@ rule map_reads:
           {params.cb_len} {params.umi_len} {threads}
         """
 
-# 5) Generate count matrix with STAR Solo (per sample)
+# 6) Generate count matrix with STAR Solo (per sample)
 rule generate_matrix:
     input:
         r1           = os.path.join(fastq_dir, "{project}", "{sample}", "R1.fastq.gz"),
         r2           = os.path.join(fastq_dir, "{project}", "{sample}", "R2.fastq.gz"),
         genomeDir    = index_dir,
-        cb_whitelist = whitelist
+        cb_whitelist = lambda wc: wl_for_sample(wc.sample)
     output:
         matrix       = os.path.join(counts_dir, "{project}", "{sample}_matrix.txt")
     threads: threads
@@ -161,10 +275,15 @@ rule generate_matrix:
         # prefix for STARsolo output (ends in underscore)
         prefix       = lambda wc, output: os.path.splitext(output.matrix)[0] + "_",
         cb_len     = lambda wc: param_map[ chem_map[wc.sample] ]["cb"],
-        umi_len    = lambda wc: param_map[ chem_map[wc.sample] ]["umi"]
+        umi_len    = lambda wc: param_map[ chem_map[wc.sample] ]["umi"],
+        layer        = config.get("counts_layer", "filtered"),
+        features_str = " ".join(config.get("solo_features", ["Gene"])),
+        script    = scripts["matrix_counts"]
     shell:
-        """
-        bash workflow/scripts/matrix_counts.sh \
+        r"""
+        COUNT_LAYER="{params.layer}" \
+        SOLO_FEATURES="{params.features_str}" \
+        bash "{params.script}" \
           "{input.r1}" \
           "{input.r2}" \
           "{input.genomeDir}" \
